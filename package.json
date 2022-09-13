@@ -1,5 +1,5 @@
 {
-  "name": "react-smarty-typeahead",
+  "name": "@zenkers/react-smarty-typeahead",
   "version": "0.1.0",
   "description": "React typeahead component hooked up to Smarty",
   "scripts": {
@@ -24,5 +24,7 @@
     "dist"
   ],
   "types": "dist/index.d.ts",
-  "dependencies": {}
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com/zenkers"
+  }
 }
