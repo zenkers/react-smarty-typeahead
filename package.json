@@ -1,6 +1,6 @@
 {
   "name": "@zenkers/react-smarty-typeahead",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "React typeahead component hooked up to Smarty",
   "scripts": {
     "rollup": "rollup -c"
