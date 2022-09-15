@@ -1,10 +1,14 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { Autocomplete, CircularProgress, TextField } from "@mui/material";
+import React from "react";
 
 interface TypeaheadProps {
-  apiKey: string;
   label: string;
-  onSelection: any;
+  apiKey: string;
+  onSelection: Function;
+}
+
+interface TypeaheadState {
+  suggestions: Array<SmartySuggestion>;
+  search: string;
 }
 
 interface SmartySuggestion {
@@ -15,150 +19,150 @@ interface SmartySuggestion {
   zipcode: string;
 }
 
-// interface SmartyAddress {
-//   city_name: string;
-//   default_city_name: string;
-//   delivery_point: string;
-//   delivery_point_check_digit: string;
-//   plus4_code: string;
-//   primary_number: string;
-//   state_abbreviation: string;
-//   street_name: string;
-//   street_suffix: string;
-//   zipcode: string;
-// }
+interface SmartyResult {
+  components: {
+    city_name: string;
+    default_city_name: string;
+    delivery_point: string;
+    delivery_point_check_digit: string;
+    plus4_code: string;
+    primary_number: string;
+    state_abbreviation: string;
+    street_name: string;
+    street_suffix: string;
+    zipcode: string;
+  };
+}
 
-const Typeahead = (props: TypeaheadProps) => {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
-  const [options, setOptions] = useState([]);
-  const autoCompleteLoading = open && options.length === 0;
+export default class TypeAheadDropDown extends React.Component<
+  TypeaheadProps,
+  TypeaheadState
+> {
+  constructor(props: TypeaheadProps) {
+    super(props);
+    this.state = {
+      suggestions: [],
+      search: "",
+    };
+  }
 
-  // Debounce autocomplete search
-  const handleSearch = useMemo(() => debounce(setSearch, 250, false), []);
-
-  // Handles selection of autocomplete option
-  const handleChange = async (val: SmartySuggestion | null) => {
-    if (!val) return;
-
-    const res = await fetch(
-      "https://us-street.api.smartystreets.com/street-address?" +
-        new URLSearchParams({
-          key: props.apiKey,
-          city: val.city,
-          state: val.state,
-          street: val.street_line,
-          secondary: val.secondary,
-        })
-    );
-
-    const data = await res.json();
-    props.onSelection(data[0].components);
+  debounce = (cb: Function, delay: number): Function => {
+    let timer: any;
+    return (...args: any) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => cb(...args), delay);
+    };
   };
 
-  const handleOpen = () => {
-    setOpen(true);
-  };
-
-  const handleClose = () => {
-    setOpen(false);
-  };
-
-  // Handles search changes
-  useEffect(() => {
-    const getAddressResults = async () => {
+  fetchAddressSuggestions = async (value: string): Promise<void> => {
+    if (value) {
       const res = await fetch(
         "https://us-autocomplete-pro.api.smartystreets.com/lookup?" +
           new URLSearchParams({
-            key: props.apiKey,
-            search: search,
+            key: this.props.apiKey,
+            search: value,
           })
       );
+
       const data = await res.json();
-      setOptions(data.suggestions || []);
-    };
+      const { suggestions } = data;
 
-    if (search) {
-      getAddressResults();
+      this.setState(() => ({
+        suggestions,
+      }));
     }
-  }, [props.apiKey, search]);
-
-  // Reset options on close
-  useEffect(() => {
-    if (!open) {
-      setOptions([]);
-    }
-  }, [open]);
-
-  return (
-    <>
-      <form>
-        <Autocomplete
-          id="ss-autocomplete"
-          open={open}
-          loading={autoCompleteLoading}
-          options={options}
-          onOpen={handleOpen}
-          onClose={handleClose}
-          onChange={(event: any, val: SmartySuggestion | null) =>
-            handleChange(val)
-          }
-          /*
-      // @ts-ignore */
-          onInputChange={(event: any, val: string) => handleSearch(val)}
-          getOptionLabel={(option: SmartySuggestion) => formatAddress(option)}
-          isOptionEqualToValue={(
-            option: SmartySuggestion,
-            value: SmartySuggestion
-          ) => option.street_line === value.street_line}
-          renderInput={(params: any) => (
-            <TextField
-              {...params}
-              label={props.label || "Enter an address"}
-              InputProps={{
-                ...params.InputProps,
-                endAdornment: (
-                  <>
-                    {autoCompleteLoading ? (
-                      <CircularProgress color="inherit" size={20} />
-                    ) : null}
-                    {params.InputProps.endAdornment}
-                  </>
-                ),
-              }}
-            />
-          )}
-        />
-      </form>
-    </>
-  );
-};
-
-export default Typeahead;
-
-const debounce = (func: any, wait: number, immediate: boolean) => {
-  let timeout: any;
-
-  return function executedFunction(this: any) {
-    const context = this;
-    const args = arguments;
-
-    /** The function to execute at the end of the debounce timer */
-    const later = () => {
-      timeout = null;
-      if (!immediate) func.apply(context, args);
-    };
-
-    const callNow = immediate && !timeout;
-
-    clearTimeout(timeout);
-
-    timeout = setTimeout(later, wait);
-
-    if (callNow) func.apply(context, args);
   };
-};
 
-const formatAddress = (addressObj: SmartySuggestion) => {
-  return `${addressObj.street_line} ${addressObj.secondary} ${addressObj.city} ${addressObj.state} ${addressObj.zipcode}`;
-};
+  debouncedFetch: any = this.debounce(
+    (value: string) => this.fetchAddressSuggestions(value),
+    500
+  );
+
+  onTextChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
+    const { value } = e.target;
+
+    if (value) {
+      this.setState(() => ({
+        search: value,
+      }));
+      this.debouncedFetch(value);
+    } else {
+      this.setState(() => ({
+        search: value,
+        suggestions: [],
+      }));
+    }
+  };
+
+  suggestionSelected = async (value: SmartySuggestion): Promise<void> => {
+    if (value) {
+      this.setState(() => ({
+        search: this.formatAddress(value),
+        suggestions: [],
+      }));
+
+      const res = await fetch(
+        "https://us-street.api.smartystreets.com/street-address?" +
+          new URLSearchParams({
+            key: this.props.apiKey,
+            city: value.city,
+            state: value.state,
+            street: value.street_line,
+            secondary: value.secondary,
+          })
+      );
+
+      const data: Array<SmartyResult> = await res.json();
+      this.props.onSelection(data[0].components);
+    } else {
+      this.setState(() => ({
+        search: "",
+        suggestions: [],
+      }));
+    }
+  };
+
+  formatAddress = (addressObj: SmartySuggestion): string => {
+    return `${addressObj.street_line} ${addressObj.secondary} ${addressObj.city} ${addressObj.state} ${addressObj.zipcode}`;
+  };
+
+  renderSuggestions = () => {
+    const { suggestions } = this.state;
+
+    if (suggestions.length === 0) {
+      return null;
+    }
+
+    return (
+      <ul>
+        {suggestions.map((address: SmartySuggestion) => {
+          return (
+            <li
+              key={this.formatAddress(address)}
+              onClick={() => this.suggestionSelected(address)}
+            >
+              {this.formatAddress(address)}
+            </li>
+          );
+        })}
+      </ul>
+    );
+  };
+
+  render() {
+    const { search } = this.state;
+    const { label } = this.props;
+
+    return (
+      <div className="TypeAheadDropDown">
+        <input
+          onChange={this.onTextChange}
+          placeholder={label}
+          value={search}
+          type="text"
+        />
+        {this.renderSuggestions()}
+      </div>
+    );
+  }
+}
